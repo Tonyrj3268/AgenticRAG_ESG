@@ -1,0 +1,16 @@
+.venv
+.env
+.env.production
+
+.vscode/
+
+__pycache__/
+.pytest_cache/
+*.pyc
+*.png
+*.jpg
+
+db.sqlite3
+.DS_Store
+
+esg_datas/
