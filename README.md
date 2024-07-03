@@ -1,6 +1,6 @@
-# ESG Agent
+# AgenticRAG_ESG
 
-ESG Agent 是一個基於 Streamlit 的應用程序，用於分析和查詢多個公司的 ESG（環境、社會和治理）報告。該應用程序使用先進的 AI 代理來處理用戶查詢，並提供相關的 ESG 信息。
+ESG Agent 是一個基於 Llamaindex 的應用程序，用於分析和查詢多個公司的 ESG（環境、社會和治理）報告。該應用程序使用先進的 AI 代理來處理用戶查詢，並提供相關的 ESG 信息。
 
 ## 功能特點
 
