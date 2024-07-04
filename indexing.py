@@ -31,7 +31,9 @@ class IndexBuilder:
         構建索引並且儲存，如果索引已經存在，則直接加載索引。
         """
         if not os.path.exists(persist_path) or rebuild:
-            index = index_class(nodes, embed_model=OpenAIEmbedding(model=model))
+            index = index_class(
+                nodes, embed_model=OpenAIEmbedding(model=model), use_async=True
+            )
             index.storage_context.persist(persist_dir=persist_path)
         else:
             index = load_index_from_storage(

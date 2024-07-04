@@ -124,6 +124,7 @@ class ESGAgent:
         )
 
 
+@st.cache_resource
 def get_esg_agent():
     SettingsManager.initialize()
     esg_agent = ESGAgent()
@@ -143,7 +144,7 @@ async def process_documents(pdf_docs):
         file_paths.append(pdf_path)
 
     documents = await DocumentLoader.get_all_files_doc(file_paths)
-
+    print(f"Processing {len(documents)} documents...")
     tasks = [
         IndexBuilder.build_vector_index(
             f"{Config.ESG_DIR_PATH}/{os.path.splitext(os.path.basename(doc[0].metadata['file_name']))[0]}/vector",
@@ -151,21 +152,23 @@ async def process_documents(pdf_docs):
         )
         for doc in documents
     ]
-    tasks.extend(
-        [
-            IndexBuilder.build_doc_summary_index(
-                f"{Config.ESG_DIR_PATH}/{os.path.splitext(os.path.basename(doc[0].metadata['file_name']))[0]}/summary",
-                doc=doc,
-            )
-            for doc in documents
-        ]
-    )
+    # tasks.extend(
+    #     [
+    #         IndexBuilder.build_doc_summary_index(
+    #             f"{Config.ESG_DIR_PATH}/{os.path.splitext(os.path.basename(doc[0].metadata['file_name']))[0]}/summary",
+    #             doc=doc,
+    #         )
+    #         for doc in documents
+    #     ]
+    # )
 
     await asyncio.gather(*tasks)
     st.session_state.companies = Config.list_companies()
 
     if "on_company_list_change" in st.session_state:
         st.session_state.on_company_list_change()
+
+    st.session_state.esg_agent = get_esg_agent()
 
 
 def update_company_list() -> None:
@@ -193,7 +196,7 @@ def update_sidebar_companies() -> None:
             with st.spinner("處理中"):
                 if pdf_docs:
                     asyncio.run(process_documents(pdf_docs))
-                    st.success("文件處理完成！請刷新頁面已生效。")
+                    st.success("文件處理完成！")
                 else:
                     st.write("沒有文件被上傳。")
 
@@ -202,7 +205,7 @@ def handle_userinput(user_question: str) -> None:
     if "chat_history" not in st.session_state:
         st.session_state.chat_history = []
 
-    response = st.session_state.esg_agent.chat(user_question)
+    response = st.session_state.esg_agent.query(user_question)
 
     st.session_state.chat_history.append({"role": "user", "content": user_question})
     st.session_state.chat_history.append(

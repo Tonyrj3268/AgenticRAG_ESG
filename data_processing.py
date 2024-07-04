@@ -2,6 +2,7 @@ import asyncio
 
 from llama_index.core import SimpleDirectoryReader
 from llama_index.core.schema import Document
+from llama_index.readers.file import PDFReader
 
 
 class DocumentLoader:
@@ -14,8 +15,10 @@ class DocumentLoader:
         return SimpleDirectoryReader(input_files=[file_path]).load_data()
 
     @staticmethod
-    async def aget_doc(file_path: str) -> list[Document]:
-        reader = await SimpleDirectoryReader(input_files=[file_path]).aload_data()
+    async def aget_doc(file_path: str, file_extractor=None) -> list[Document]:
+        reader = await SimpleDirectoryReader(
+            input_files=[file_path], file_extractor=file_extractor
+        ).aload_data(show_progress=True)
         return reader
 
     @staticmethod
@@ -29,5 +32,10 @@ class DocumentLoader:
         Returns:
             list[list[Document]]: 所有文檔的數據列表
         """
-        tasks = [DocumentLoader.aget_doc(file_path) for file_path in file_paths]
+        parser = PDFReader()
+        file_extractor = {".pdf": parser}
+        tasks = [
+            DocumentLoader.aget_doc(file_path, file_extractor)
+            for file_path in file_paths
+        ]
         return await asyncio.gather(*tasks)
