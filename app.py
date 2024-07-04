@@ -11,7 +11,6 @@ class Config:
     INDUSTRY_FILE_PATH = os.getenv(
         "INDUSTRY_FILE_PATH", os.path.join(ESG_DIR_PATH, "company_industry.json")
     )
-    OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
     VERBOSE = os.getenv("VERBOSE", "True").lower() == "true"
 
     @classmethod
@@ -25,26 +24,25 @@ class Config:
         ]
 
 
+# !!! Set this API key before any other imports
+# os.environ["OPENAI_API_KEY"] = "your-api-key"
+
 import asyncio
 
 import nest_asyncio
 import streamlit as st
-from llama_index.agent.openai import OpenAIAgent, OpenAIAgentWorker
+from llama_index.agent.openai import OpenAIAgent
 from llama_index.core import Settings
 from llama_index.core.agent import ReActAgent
 from llama_index.core.callbacks import CallbackManager, LlamaDebugHandler
-from llama_index.core.query_engine import RouterQueryEngine
-from llama_index.core.selectors import LLMSingleSelector
-from llama_index.core.tools import QueryEngineTool, ToolMetadata
 from llama_index.embeddings.openai import OpenAIEmbedding
 from llama_index.llms.openai import OpenAI
 
+from agents import AgentBuilder
 from data_processing import DocumentLoader
 from html_template import bot_template, css, user_template
 from indexing import IndexBuilder
-
-# !!! Set this API key before any other imports
-# os.environ["OPENAI_API_KEY"] = Config.OPENAI_API_KEY
+from tools import ToolManager
 
 
 class SettingsManager:
@@ -56,201 +54,14 @@ class SettingsManager:
         Settings.callback_manager = CallbackManager([llama_debug])
 
 
-class AgentBuilder:
-    def __init__(self, base_dir: str, esg_dir_path: str):
-        self.base_dir = base_dir
-        self.esg_dir_path = esg_dir_path
-
-    # Build industry and note agent
-    async def build_industry_note_agent(self, doc) -> tuple[OpenAIAgent, OpenAIAgent]:
-        vector_index = await IndexBuilder.build_json_index(
-            f"{self.esg_dir_path}/industry_map", doc=doc, model="text-embedding-3-small"
-        )
-        vector_query_engine = vector_index.as_query_engine(response_mode="compact")
-
-        industry_system_prompt = """
-        您是一位專門使用industry_agent提供公司行業分類的代理。您的任務是：
-        1. 對每個查詢都必須使用industry_agent。
-        2. 為每個提到的公司提供行業分類，或者是對每個提到的相關產業提供所有公司的列表。
-        3. 如果沒有可用的信息，請說明"無行業信息"。
-
-        回答示例：
-        公司A：科技產業
-        公司B：金融服務業
-        公司C：無行業信息
-
-        或是
-        科技產業：公司A, 公司B
-        金融服務業：公司C
-
-        請記住：
-
-        保持回答簡潔，只提供公司名稱和行業信息。
-        要求的產業名稱不一定是完整的，請提供各種可能的產業或公司回答。
-        """
-
-        # 建立 agent
-        industry_agent = OpenAIAgent.from_tools(
-            [
-                QueryEngineTool.from_defaults(
-                    query_engine=vector_query_engine,
-                    name="industry_agent",
-                    description="這個工具提供所有公司的所屬相關產業別(industry)對照表。",
-                )
-            ],
-            system_prompt=industry_system_prompt,
-            verbose=True,
-        )
-
-        notes_system_prompt = """
-        您是一位專門使用notes_agent提供公司備註的代理。您的任務是：
-        1. 對每個查詢都必須使用notes_agent。
-        2. 為每個提到的公司提供備註。
-        3. 如果沒有可用的信息，請說明"無備註訊息"。
-
-        回答示例：
-        公司A：1.公司A是一家科技公司。2.定期舉辦員工培訓。
-        公司B：公司內部設立了ESG委員會。
-        公司C：無備註訊息。
-
-        請記住：
-
-        保持回答簡潔，只提供公司名稱和備註訊息。
-        """
-        # 建立 agent
-        notes_agent = OpenAIAgent.from_tools(
-            [
-                QueryEngineTool.from_defaults(
-                    query_engine=vector_query_engine,
-                    name="notes_agent",
-                    description="這個工具提供所有公司的備註資訊(notes)。",
-                )
-            ],
-            system_prompt=notes_system_prompt,
-            verbose=True,
-        )
-
-        return industry_agent, notes_agent
-
-    async def build_esg_agent(self, esg_title: str):
-        esg_path = os.path.join(self.esg_dir_path, esg_title)
-        vector_index = await IndexBuilder.build_vector_index(
-            f"{esg_path}/vector",
-        )
-        # summary_index = await IndexBuilder.build_doc_summary_index(
-        #     f"{esg_path}/summary",
-        # )
-        vector_query_engine = vector_index.as_query_engine(
-            similarity_top_k=10, use_async=True
-        )
-        # summary_query_engine = summary_index.as_query_engine(
-        #     response_mode="simple_summarize",
-        #     use_async=True,
-        #     llm=OpenAI(temperature=0, model="gpt-3.5-turbo"),
-        # )
-        query_engine_tools = [
-            QueryEngineTool(
-                query_engine=vector_query_engine,
-                metadata=ToolMetadata(
-                    name=f"vector_tool_{esg_title.split('_')[0]}",
-                    description=f"這份文件主要是{esg_title}在環境、社會及治理相關的資訊，傳達企業在永續經營上的規劃與成果，透過提高資訊透明度的方式，讓各個利害關係人能透過永續報告書，清楚的檢視企業的永續政策推動與管理成效。",
-                ),
-            ),
-            # QueryEngineTool.from_defaults(
-            #     query_engine=summary_query_engine,
-            #     name=f"summary_tool_{esg_title.split('_')[0]}",
-            #     description=f"提供關於{esg_title}的永續報告書的摘要、總結的工具",
-            # ),
-        ]
-        openai_step_engine = OpenAIAgentWorker.from_tools(
-            query_engine_tools, verbose=Config.VERBOSE, max_rollouts=3, num_expansions=2
-        )
-        return OpenAIAgent.from_tools(
-            query_engine_tools,
-            verbose=Config.VERBOSE,
-            openai_step_engine=openai_step_engine,
-        )
-
-    async def build_esg_agents(
-        self,
-        esg_titles: list[str],
-        esg_docs={},
-    ) -> dict[str, OpenAIAgent]:
-        tasks = [self.build_esg_agent(esg_title) for esg_title in esg_titles]
-        agents = await asyncio.gather(*tasks)
-        return dict(zip(esg_titles, agents))
-
-
-class ToolManager:
-    def __init__(self):
-        self.industry_tool = None
-        self.note_tool = None
-        self.esg_agent_tool = None
-
-    def get_all_tools(self):
-        return [
-            tool
-            for tool in (self.industry_tool, self.esg_agent_tool, self.note_tool)
-            if tool
-        ]
-
-    def add_industry_tool(self, industry_agent):
-
-        industry_description = """
-        This content contains all the company's industry. Use this if you want to find the companies belong specific industry.
-        Always use compare_tool to get more information about the company.
-        """
-        self.industry_tool = QueryEngineTool(
-            query_engine=industry_agent,
-            metadata=ToolMetadata(
-                name=f"industry_tool",
-                description=industry_description,
-            ),
-        )
-
-    def add_note_tool(self, note_agent):
-        notes_description = """
-        This content contains all the company's notes. Use this if you want to find the companies belong specific notes.
-        Always use this tool to get more information after using compare_tool.
-        """
-        self.note_tool = QueryEngineTool(
-            query_engine=note_agent,
-            metadata=ToolMetadata(
-                name="notes_tool",
-                description=notes_description,
-            ),
-        )
-
-    def add_document_tools(self, agents: dict[str, OpenAIAgent], esg_titles: list[str]):
-        all_tools = []
-        for esg_title in esg_titles:
-            doc_tool = QueryEngineTool(
-                query_engine=agents[esg_title],
-                metadata=ToolMetadata(
-                    name=f"subAgent_{esg_title.split('_')[0]}",
-                    description=f"This content contains ESG report about {esg_title}. Use this tool if you want to answer any questions about {esg_title}.",
-                ),
-            )
-            all_tools.append(doc_tool)
-
-        router_engine = RouterQueryEngine(
-            selector=LLMSingleSelector.from_defaults(), query_engine_tools=all_tools
-        )
-        self.esg_agent_tool = QueryEngineTool.from_defaults(
-            query_engine=router_engine,
-            name="esg_agent_tool",
-            description="一個用於分析指定公司的ESG報告的工具。使用它来調查問題中指定的公司ESG報告中的環境、社會和治理實踐，比較永續發展倡議，或尋找有關企業責任和道德實踐的具體資訊。",
-        )
-
-
 class ESGAgent:
-    def __init__(self):
+    def __init__(self) -> None:
         self.industry_doc = DocumentLoader.get_doc(Config.INDUSTRY_FILE_PATH)
         self.agent_builder = AgentBuilder(Config.BASE_DIR, Config.ESG_DIR_PATH)
         self.tool_manager = ToolManager()
         self.agent = None
 
-    async def initialize(self):
+    async def initialize(self) -> None:
         industry_note_agent_task = self.agent_builder.build_industry_note_agent(
             self.industry_doc
         )
@@ -358,11 +169,11 @@ async def process_documents(pdf_docs):
         st.session_state.on_company_list_change()
 
 
-def update_company_list():
+def update_company_list() -> None:
     st.session_state.company_selector = st.session_state.companies
 
 
-def update_sidebar_companies():
+def update_sidebar_companies() -> None:
     st.sidebar.subheader("公司列表")
     if "companies" not in st.session_state:
         st.session_state.companies = Config.list_companies()
@@ -383,16 +194,16 @@ def update_sidebar_companies():
             with st.spinner("處理中"):
                 if pdf_docs:
                     asyncio.run(process_documents(pdf_docs))
-                    st.success("文件處理完成！")
+                    st.success("文件處理完成！請刷新頁面已生效。")
                 else:
                     st.write("沒有文件被上傳。")
 
 
-def handle_userinput(user_question):
+def handle_userinput(user_question: str) -> None:
     if "chat_history" not in st.session_state:
         st.session_state.chat_history = []
 
-    response = st.session_state.esg_agent.query(user_question)
+    response = st.session_state.esg_agent.chat(user_question)
 
     st.session_state.chat_history.append({"role": "user", "content": user_question})
     st.session_state.chat_history.append(

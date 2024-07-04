@@ -1,6 +1,7 @@
 .venv
 .env
 .env.production
+*.pem
 
 .vscode/
 

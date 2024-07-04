@@ -1,6 +1,8 @@
 import asyncio
 
-from app import AgentBuilder, Config, DocumentLoader, SettingsManager
+from agents import AgentBuilder
+from app import Config, SettingsManager
+from data_processing import DocumentLoader
 
 
 async def test_industry_agent_builder():
