@@ -124,7 +124,6 @@ class ESGAgent:
         )
 
 
-@st.cache_resource
 def get_esg_agent():
     SettingsManager.initialize()
     esg_agent = ESGAgent()

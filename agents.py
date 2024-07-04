@@ -4,7 +4,6 @@ import os
 from llama_index.agent.openai import OpenAIAgent, OpenAIAgentWorker
 from llama_index.core.tools import QueryEngineTool, ToolMetadata
 
-from app import Config
 from indexing import IndexBuilder
 
 
@@ -51,7 +50,7 @@ class AgentBuilder:
                 )
             ],
             system_prompt=industry_system_prompt,
-            verbose=Config.VERBOSE,
+            verbose=True,
         )
 
         notes_system_prompt = """
@@ -79,7 +78,7 @@ class AgentBuilder:
                 )
             ],
             system_prompt=notes_system_prompt,
-            verbose=Config.VERBOSE,
+            verbose=True,
         )
 
         return industry_agent, notes_agent
@@ -115,18 +114,17 @@ class AgentBuilder:
             # ),
         ]
         openai_step_engine = OpenAIAgentWorker.from_tools(
-            query_engine_tools, verbose=Config.VERBOSE, max_rollouts=3, num_expansions=2
+            query_engine_tools, verbose=True, max_rollouts=3, num_expansions=2
         )
         return OpenAIAgent.from_tools(
             query_engine_tools,
-            verbose=Config.VERBOSE,
+            verbose=True,
             openai_step_engine=openai_step_engine,
         )
 
     async def build_esg_agents(
         self,
         esg_titles: list[str],
-        esg_docs={},
     ) -> dict[str, OpenAIAgent]:
         tasks = [self.build_esg_agent(esg_title) for esg_title in esg_titles]
         agents = await asyncio.gather(*tasks)
