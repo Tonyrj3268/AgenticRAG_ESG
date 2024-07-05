@@ -1,5 +1,5 @@
 from llama_index.agent.openai import OpenAIAgent
-from llama_index.core.query_engine import RouterQueryEngine
+from llama_index.core.query_engine import RouterQueryEngine, SubQuestionQueryEngine
 from llama_index.core.selectors import LLMSingleSelector
 from llama_index.core.tools import QueryEngineTool, ToolMetadata
 
@@ -21,7 +21,6 @@ class ToolManager:
 
         industry_description = """
         This content contains all the company's industry. Use this if you want to find the companies belong specific industry.
-        Always use compare_tool to get more information about the company.
         """
         self.industry_tool = QueryEngineTool(
             query_engine=industry_agent,
@@ -34,7 +33,6 @@ class ToolManager:
     def add_note_tool(self, note_agent: OpenAIAgent) -> None:
         notes_description = """
         This content contains all the company's notes. Use this if you want to find the companies belong specific notes.
-        Always use this tool to get more information after using compare_tool.
         """
         self.note_tool = QueryEngineTool(
             query_engine=note_agent,
@@ -61,6 +59,11 @@ class ToolManager:
         router_engine = RouterQueryEngine(
             selector=LLMSingleSelector.from_defaults(), query_engine_tools=all_tools
         )
+        # sub_question_engine = SubQuestionQueryEngine.from_defaults(
+        #     # question_gen=OpenAIQuestionGenerator.from_defaults(verbose=True),
+        #     query_engine_tools=all_tools,
+        #     use_async=True,
+        # )
         self.esg_agent_tool = QueryEngineTool.from_defaults(
             query_engine=router_engine,
             name="esg_agent_tool",
