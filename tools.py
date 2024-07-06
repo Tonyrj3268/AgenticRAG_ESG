@@ -32,7 +32,8 @@ class ToolManager:
 
     def add_note_tool(self, note_agent: OpenAIAgent) -> None:
         notes_description = """
-        This content contains all the company's notes. Use this if you want to find the companies belong specific notes.
+        This content contains all the company's notes. 
+        Always use this if you didn't see the notes been contained after the final esg_agent_tool be used.
         """
         self.note_tool = QueryEngineTool(
             query_engine=note_agent,

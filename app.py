@@ -42,6 +42,7 @@ from agents import AgentBuilder
 from data_processing import DocumentLoader
 from html_template import bot_template, css, user_template
 from indexing import IndexBuilder
+from prompts import GENERAL_AGENT_PROMPT, GENERAL_AGENT_PROMPT_EN
 from tools import ToolManager
 
 
@@ -75,51 +76,7 @@ class ESGAgent:
         self.tool_manager.add_document_tools(esg_agents, Config.list_companies())
         self.agent = OpenAIAgent.from_tools(
             tools=self.tool_manager.get_all_tools(),
-            system_prompt="""
-            您是一個先進的代理人，您的手上有三個工具：industry_tool、esg_agent_tool 和 notes_tool。
-            
-            處理流程
-
-                1. 分析用戶查詢,確定是針對特定公司還是整個行業。
-                2. 如果查詢提到具體公司:
-                    a. 直接進行步驟 4。
-                3. 如果查詢提到行業而非具體公司:
-                    a. 使用 industry_tool 獲取該行業的所有相關公司。
-                    b. 對每家識別出的公司執行步驟4 。
-                4. 使用 esg_agent_tool 針對每家公司查詢相關的 ESG 信息。
-                5. 使用 notes_tool 獲取每家公司的額外註釋，但只保留與查詢直接相關的信息。
-                6. 整合所有收集到的信息,提供全面的回答。
-
-            回答格式
-            對每家相關公司,提供以下信息:
-
-            公司名稱:[名稱]
-            行業:[行業分類]
-            ESG 相關信息:[針對查詢的具體 ESG 資訊]
-            備註:[僅包含與查詢直接相關的備註，如無則省略此項]
-
-            問題範例及處理流程
-
-            1. 愛之味的員工薪水是多少？
-
-            處理流程:
-            a. 識別這是針對單一公司(愛之味)的查詢
-            b. 使用 industry_tool 確認愛之味的行業
-            c. 使用 esg_agent_tool 查詢 "愛之味的員工薪水"
-            d. 使用 notes_tool 獲取愛之味的備註，但僅保留與員工薪水相關的信息
-            e. 整合信息並回答
-
-            2. 請分析食品業的員工薪水
-
-            處理流程:
-            a. 識別這是針對整個行業(食品業)的查詢
-            b. 使用 industry_tool 查詢食品業的所有公司(例如:愛之味、統一)
-            c. 對每家公司:
-
-            使用 esg_agent_tool 查詢 "請分析[公司名稱]的員工薪水"
-            使用 notes_tool 獲取公司備註，但僅保留與員工薪水相關的信息
-            d. 整合所有公司的信息,分析食品業整體薪水情況
-            """,
+            system_prompt=GENERAL_AGENT_PROMPT_EN,
             verbose=Config.VERBOSE,
         )
 
@@ -144,7 +101,6 @@ async def process_documents(pdf_docs):
         file_paths.append(pdf_path)
 
     documents = await DocumentLoader.get_all_files_doc(file_paths)
-    print(f"Processing {len(documents)} documents...")
     tasks = [
         IndexBuilder.build_vector_index(
             f"{Config.ESG_DIR_PATH}/{os.path.splitext(os.path.basename(doc[0].metadata['file_name']))[0]}/vector",
@@ -207,13 +163,13 @@ def handle_userinput(user_question: str) -> None:
 
     response = st.session_state.esg_agent.query(user_question)
 
-    st.session_state.chat_history.append({"role": "user", "content": user_question})
     st.session_state.chat_history.append(
         {"role": "assistant", "content": str(response)}
     )
+    st.session_state.chat_history.append({"role": "user", "content": user_question})
 
     # Display chat history
-    for message in st.session_state.chat_history:
+    for message in st.session_state.chat_history[::-1]:
         template = user_template if message["role"] == "user" else bot_template
         st.write(
             template.replace("{{MSG}}", message["content"]), unsafe_allow_html=True

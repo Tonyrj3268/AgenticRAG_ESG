@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "agenticrag-esg"
+name = "agenticrag_esg"
 version = "0.1.0"
 description = ""
 authors = ["TonyLin <chiacheng.lin0@gmail.com>"]
