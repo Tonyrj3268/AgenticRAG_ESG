@@ -136,12 +136,14 @@ def update_sidebar_companies() -> None:
     if "companies" not in st.session_state:
         st.session_state.companies = Config.list_companies()
     st.session_state.on_company_list_change = update_company_list
+    company_count = len(st.session_state.companies)
+    st.sidebar.write(f"目前共有 {company_count} 家企業永續報告書")
     with st.sidebar.expander("點擊展開", expanded=False):
         if st.session_state.companies:
             for company in st.session_state.companies:
                 st.write(company)
         else:
-            st.write("目前沒有已存的公司。")
+            st.write("目前沒有已存的企業永續報告書。")
 
     with st.sidebar:
         st.subheader("你的文件")
@@ -178,11 +180,11 @@ def handle_userinput(user_question: str) -> None:
 
 # 主函數
 def main():
-    st.set_page_config(page_title="與你的PDF聊天", page_icon=":books:")
+    st.set_page_config(page_title="向你的PDF問問題", page_icon=":books:")
     st.write(css, unsafe_allow_html=True)
     st.session_state.esg_agent = get_esg_agent()
 
-    st.header("與多個PDF聊天 :books:")
+    st.header("向多個PDF問問題 :books:")
     user_question = st.text_input(
         "問一個關於你文件的問題：（模型：GPT-4o · 生成的內容可能不准確或錯誤）"
     )
