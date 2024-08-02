@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 
 from dotenv import load_dotenv
 
@@ -6,8 +7,9 @@ load_dotenv()  # 加載 .env 文件
 
 
 class Config:
-    BASE_DIR = os.getenv("BASE_DIR", ".")
-    ESG_DIR_PATH = os.getenv("ESG_DIR_PATH", os.path.join(BASE_DIR, "esg_datas"))
+    LLAMAPARSE_API_KEY = os.getenv("LLAMAPARSE_API_KEY")
+    project_root = Path(__file__).resolve().parent.parent
+    ESG_DIR_PATH = os.path.join(project_root, os.getenv("ESG_DIR_PATH"))
     INDUSTRY_FILE_PATH = os.getenv(
         "INDUSTRY_FILE_PATH", os.path.join(ESG_DIR_PATH, "company_industry.json")
     )
@@ -38,18 +40,23 @@ from llama_index.core.callbacks import CallbackManager, LlamaDebugHandler
 from llama_index.embeddings.openai import OpenAIEmbedding
 from llama_index.llms.openai import OpenAI
 
-from agents import AgentBuilder
-from data_processing import DocumentLoader
-from html_template import bot_template, css, user_template
-from indexing import IndexBuilder
-from prompts import GENERAL_AGENT_PROMPT, GENERAL_AGENT_PROMPT_EN
-from tools import ToolManager
+from src.agents import AgentBuilder
+from src.data_processing import DocumentLoader
+from src.html_template import bot_template, css, user_template
+from src.indexing import IndexBuilder
+from src.prompts import (
+    GENERAL_AGENT_PROMPT,
+    GENERAL_AGENT_PROMPT_EN,
+    GENERAL_AGENT_PROMPT_NO_NOTE_EN,
+)
+from src.tools import ToolManager
 
 
 class SettingsManager:
     @staticmethod
     def initialize():
-        Settings.llm = OpenAI(temperature=0, model="gpt-4o-2024-05-13")
+        model = "gpt-4o-mini"
+        Settings.llm = OpenAI(temperature=0, model=model)
         Settings.embed_model = OpenAIEmbedding(model="text-embedding-3-large")
         llama_debug = LlamaDebugHandler(print_trace_on_end=True)
         Settings.callback_manager = CallbackManager([llama_debug])
@@ -57,8 +64,10 @@ class SettingsManager:
 
 class ESGAgent:
     def __init__(self) -> None:
-        self.industry_doc = DocumentLoader.get_doc(Config.INDUSTRY_FILE_PATH)
-        self.agent_builder = AgentBuilder(Config.BASE_DIR, Config.ESG_DIR_PATH)
+        self.industry_doc = DocumentLoader(Config.LLAMAPARSE_API_KEY).get_doc(
+            Config.INDUSTRY_FILE_PATH
+        )
+        self.agent_builder = AgentBuilder(Config.ESG_DIR_PATH)
         self.tool_manager = ToolManager()
         self.agent = None
 
@@ -68,15 +77,15 @@ class ESGAgent:
         )
         esg_agents_task = self.agent_builder.build_esg_agents(Config.list_companies())
 
-        (industry_agent, note_agent), esg_agents = await asyncio.gather(
+        (industry_agent, _), esg_agents = await asyncio.gather(
             industry_note_agent_task, esg_agents_task
         )
         self.tool_manager.add_industry_tool(industry_agent)
-        self.tool_manager.add_note_tool(note_agent)
+        # self.tool_manager.add_note_tool(note_agent)
         self.tool_manager.add_document_tools(esg_agents, Config.list_companies())
         self.agent = OpenAIAgent.from_tools(
             tools=self.tool_manager.get_all_tools(),
-            system_prompt=GENERAL_AGENT_PROMPT_EN,
+            system_prompt=GENERAL_AGENT_PROMPT_NO_NOTE_EN,
             verbose=Config.VERBOSE,
         )
 
@@ -100,23 +109,16 @@ async def process_documents(pdf_docs):
             f.write(pdf_doc.getbuffer())
         file_paths.append(pdf_path)
 
-    documents = await DocumentLoader.get_all_files_doc(file_paths)
+    documents = await DocumentLoader(Config.LLAMAPARSE_API_KEY).get_all_files_doc(
+        file_paths
+    )
     tasks = [
-        IndexBuilder.build_vector_index(
-            f"{Config.ESG_DIR_PATH}/{os.path.splitext(os.path.basename(doc[0].metadata['file_name']))[0]}/vector",
-            doc=doc,
+        IndexBuilder().build_vector_index(
+            f"{Config.ESG_DIR_PATH}/{os.path.splitext(os.path.basename(document[0].metadata['file_name']))[0]}/vector",
+            data=document,
         )
-        for doc in documents
+        for document in documents
     ]
-    # tasks.extend(
-    #     [
-    #         IndexBuilder.build_doc_summary_index(
-    #             f"{Config.ESG_DIR_PATH}/{os.path.splitext(os.path.basename(doc[0].metadata['file_name']))[0]}/summary",
-    #             doc=doc,
-    #         )
-    #         for doc in documents
-    #     ]
-    # )
 
     await asyncio.gather(*tasks)
     st.session_state.companies = Config.list_companies()
