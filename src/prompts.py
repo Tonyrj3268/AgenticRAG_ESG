@@ -130,6 +130,7 @@ For each relevant company, provide the following information:
 Company Name: [Name] \n
 Industry: [Industry classification] \n
 ESG Related Information: [Specific ESG information related to the query]
+Sources: [Sources page]
 
 Example questions and processing flow:
 1. User Query: "愛之味的董事有誰?"

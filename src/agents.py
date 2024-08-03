@@ -63,7 +63,6 @@ class AgentBuilder:
             persist_path=f"{esg_path}/vector",
         )
         nodes = list(vector_index.docstore.docs.values())
-
         text_qa_template = PromptTemplate(TEXT_QA_TEMPLATE)
         vector_query_engine = vector_index.as_query_engine(
             similarity_top_k=20,

@@ -26,9 +26,6 @@ class Config:
         ]
 
 
-# !!! Set this API key before any other imports
-# os.environ["OPENAI_API_KEY"] = "your-api-key"
-
 import asyncio
 
 import nest_asyncio
@@ -36,7 +33,6 @@ import streamlit as st
 from llama_index.agent.openai import OpenAIAgent
 from llama_index.core import Settings
 from llama_index.core.agent import ReActAgent
-from llama_index.core.callbacks import CallbackManager, LlamaDebugHandler
 from llama_index.embeddings.openai import OpenAIEmbedding
 from llama_index.llms.openai import OpenAI
 
@@ -58,8 +54,81 @@ class SettingsManager:
         model = "gpt-4o-mini"
         Settings.llm = OpenAI(temperature=0, model=model)
         Settings.embed_model = OpenAIEmbedding(model="text-embedding-3-large")
-        llama_debug = LlamaDebugHandler(print_trace_on_end=True)
-        Settings.callback_manager = CallbackManager([llama_debug])
+
+
+from typing import Optional
+
+import llama_index.core.instrumentation as instrument
+from llama_index.core.instrumentation.event_handlers import BaseEventHandler
+from llama_index.core.instrumentation.events import BaseEvent
+from llama_index.core.instrumentation.span_handlers import SimpleSpanHandler
+
+
+class NaiveEventHandler(BaseEventHandler):
+    @classmethod
+    def class_name(cls) -> str:
+        """Class name."""
+        return "NaiveEventHandler"
+
+    @classmethod
+    def _get_pretty_dict_str(
+        cls, _dict: dict, skip_keys: Optional[list] = None, indent_str: str = ""
+    ) -> str:
+        _skip_keys = skip_keys or []
+
+        ret = ""
+        for _k, _v in _dict.items():
+            if _k in _skip_keys:
+                continue
+            ret += f"{indent_str}{_k}: {_v}\n"
+        return ret
+
+    @classmethod
+    def _get_pretty_even_str(cls, event: BaseEvent) -> str:
+        _indent = "    "
+        ret = ""
+
+        for ek, ev in event.dict().items():
+            if ek == "model_dict":
+                continue
+                # dict
+                ret += f"{ek}:\n"
+                ret += cls._get_pretty_dict_str(
+                    ev, skip_keys=["api_key"], indent_str=_indent
+                )
+            elif ek == "embeddings":
+                continue
+                # List[List[float]]
+                ret += f"{ek}: "
+                ret += ",".join([f"<{len(_embedding)}-dim>" for _embedding in ev])
+                ret += "\n"
+            elif ek == "nodes":
+                # List[NodeWithScore]
+                # NodeWithScore is still too long; cannot think of a good repr in pure text
+                ret += f"{ek}:\n"
+                for _n in ev:
+                    ret += f"{_indent}{_n}\n"
+            elif ek == "messages":
+                # List[ChatMessage]
+                ret += f"{ek}:\n"
+                for _n in ev:
+                    ret += f"{_indent}{_n}\n"
+            else:
+                ret += f"{ek}: {ev}\n"
+
+        return ret
+
+    def handle(self, event: BaseEvent, **kwargs):
+        """Logic for handling event."""
+        with open("log.txt", "a") as f:
+            f.write(self._get_pretty_even_str(event))
+            f.write("\n")
+
+
+dispatcher = instrument.get_dispatcher()
+dispatcher.add_event_handler(NaiveEventHandler())
+span_handler = SimpleSpanHandler()
+dispatcher.add_span_handler(span_handler)
 
 
 class ESGAgent:
@@ -126,7 +195,7 @@ async def process_documents(pdf_docs):
     if "on_company_list_change" in st.session_state:
         st.session_state.on_company_list_change()
 
-    st.session_state.esg_agent = get_esg_agent()
+    # st.session_state.esg_agent = get_esg_agent()
 
 
 def update_company_list() -> None:
