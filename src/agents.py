@@ -6,9 +6,9 @@ from llama_index.core import PromptTemplate
 from llama_index.core.postprocessor import LLMRerank
 from llama_index.core.tools import QueryEngineTool, ToolMetadata
 
-from src.indexing import IndexBuilder
-from src.node_prcessors import PageGroupPostprocessor
-from src.prompts import (
+from indexing import IndexBuilder
+from node_prcessors import PageGroupPostprocessor
+from prompts import (
     ESG_AGENT_PROMPT_EN,
     INDUSTRY_AGENT_PROMPT,
     INDUSTRY_AGENT_PROMPT_EN,
@@ -83,16 +83,12 @@ class AgentBuilder:
                 ),
             ),
         ]
-
-        # openai_step_engine = OpenAIAgentWorker.from_tools(
-        #     query_engine_tools, verbose=True, max_rollouts=3, num_expansions=2
-        # )
-        return OpenAIAgent.from_tools(
+        agent = OpenAIAgent.from_tools(
             query_engine_tools,
             verbose=True,
-            # system_prompt=ESG_AGENT_PROMPT_EN,
-            # openai_step_engine=openai_step_engine,
+            system_prompt=ESG_AGENT_PROMPT_EN,
         )
+        return agent
 
     async def build_esg_agents(
         self,

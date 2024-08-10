@@ -36,16 +36,16 @@ from llama_index.core.agent import ReActAgent
 from llama_index.embeddings.openai import OpenAIEmbedding
 from llama_index.llms.openai import OpenAI
 
-from src.agents import AgentBuilder
-from src.data_processing import DocumentLoader
-from src.html_template import bot_template, css, user_template
-from src.indexing import IndexBuilder
-from src.prompts import (
+from agents import AgentBuilder
+from data_processing import DocumentLoader
+from html_template import bot_template, css, user_template
+from indexing import IndexBuilder
+from prompts import (
     GENERAL_AGENT_PROMPT,
     GENERAL_AGENT_PROMPT_EN,
     GENERAL_AGENT_PROMPT_NO_NOTE_EN,
 )
-from src.tools import ToolManager
+from tools import ToolManager
 
 
 class SettingsManager:

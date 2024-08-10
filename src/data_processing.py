@@ -61,10 +61,7 @@ class DocumentLoader:
         Returns:
             list[Document]: 包含文檔內容的Document對象列表
         """
-        file_extractor = {".pdf": self.md_parser}
-        document = await SimpleDirectoryReader(
-            input_files=[file_path], file_extractor=file_extractor
-        ).aload_data()
+        document = await self.md_parser.aload_data(file_path)
         for i, doc in enumerate(document):
             doc.metadata = {"pages": i + 1, "file_name": file_path.split("/")[-1]}
             doc.text_template = str(

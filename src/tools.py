@@ -9,7 +9,9 @@ class ToolManager:
         self.tools = []
 
     def get_all_tools(self) -> list[QueryEngineTool]:
-        return [tool for tool in self.tools]
+        if len(self.tools) == 0:
+            raise ValueError("No tools added yet.")
+        return self.tools
 
     def add_industry_tool(self, industry_agent: OpenAIAgent) -> None:
 

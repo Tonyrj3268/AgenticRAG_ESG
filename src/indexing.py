@@ -14,9 +14,6 @@ class IndexBuilder:
     索引構建器
     """
 
-    def __init__(self, model: str = "text-embedding-3-large"):
-        self.embed_model = OpenAIEmbedding(model=model)
-
     async def build_index(
         self,
         index_class: BaseIndex,
@@ -27,7 +24,7 @@ class IndexBuilder:
         構建索引並且儲存，如果索引已經存在，則直接加載索引。
         """
         if not os.path.exists(persist_path) or data is not None:
-            index = index_class(data, embed_model=self.embed_model, use_async=True)
+            index = index_class(data, use_async=True)
             index.storage_context.persist(persist_dir=persist_path)
         else:
             index = load_index_from_storage(

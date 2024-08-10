@@ -17,3 +17,4 @@ db.sqlite3
 esg_datas/
 
 log.txt
+*.txt
